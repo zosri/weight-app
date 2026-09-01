@@ -1,5 +1,5 @@
 import React from 'react'
-import { C } from '../tokens.js'
+import { C, T, W } from '../tokens.js'
 import { formatDateTime, SLOT_LABEL } from '../lib/date.js'
 
 export default function MeasurementList({ points, onDelete }) {
@@ -8,25 +8,27 @@ export default function MeasurementList({ points, onDelete }) {
 
   return (
     <section>
-      <h2 style={{ fontSize: 13.5, fontWeight: 500, margin: '0 0 8px' }}>Τελευταίες μετρήσεις</h2>
+      <h2 style={{ fontSize: T.base, fontWeight: W.medium, margin: '0 0 6px' }}>
+        Τελευταίες μετρήσεις
+      </h2>
       {recent.map((p) => (
         <div key={p.id} style={{
           display: 'flex', alignItems: 'baseline', gap: 10,
-          padding: '9px 4px', borderBottom: `1px solid ${C.grid}`, fontSize: 13.5,
+          padding: '11px 2px', borderBottom: `1px solid ${C.grid}`,
         }}>
-          <span style={{ fontVariantNumeric: 'tabular-nums', minWidth: 58 }}>
-            {p.weight.toFixed(1)} kg
+          <span style={{
+            fontSize: T.base, fontWeight: W.medium,
+            fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap',
+          }}>
+            {p.weight.toFixed(1)}
           </span>
-          <span style={{ color: C.muted, fontSize: 12, flex: 1 }}>
-            {formatDateTime(p.t)} · {SLOT_LABEL[p.slot]}
-          </span>
-          <span style={{ color: C.muted, fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
-            τάση {p.ewma.toFixed(2)}
+          <span style={{ flex: 1, fontSize: T.xs, color: C.muted, lineHeight: 1.3 }}>
+            {formatDateTime(p.t)}<br />{SLOT_LABEL[p.slot]} · τάση {p.ewma.toFixed(2)}
           </span>
           <button onClick={() => onDelete(p.id)} aria-label="Διαγραφή μέτρησης"
                   style={{
                     border: 'none', background: 'transparent', color: C.muted,
-                    cursor: 'pointer', fontSize: 15, fontFamily: 'inherit', padding: '0 4px',
+                    cursor: 'pointer', fontSize: T.lg, padding: '2px 8px',
                   }}>×</button>
         </div>
       ))}

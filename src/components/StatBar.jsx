@@ -1,27 +1,43 @@
 import React from 'react'
-import { C } from '../tokens.js'
+import { C, T, W } from '../tokens.js'
 
-function Cell({ label, value, unit, note }) {
-  return (
-    <div style={{ flex: '1 1 0', minWidth: 130, padding: '16px 18px' }}>
-      <div style={{ fontSize: 12, color: C.muted, marginBottom: 5 }}>{label}</div>
-      <div style={{ fontSize: 26, fontWeight: 300, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
-        {value}
-        {unit && <span style={{ fontSize: 13, color: C.muted, marginLeft: 4 }}>{unit}</span>}
-      </div>
-      {note && <div style={{ fontSize: 11.5, color: C.muted, marginTop: 4 }}>{note}</div>}
-    </div>
-  )
-}
-
+/**
+ * Τα βασικά νούμερα σε γραμμές, όχι στήλες.
+ * Σε οθόνη κινητού τρεις στήλες δεν χωράνε και σπρώχνουν
+ * ολόκληρη τη σελίδα πλάγια.
+ */
 export default function StatBar({ items }) {
   return (
-    <section style={{ display: 'flex', flexWrap: 'wrap', background: C.panel, border: `1px solid ${C.grid}` }}>
+    <section style={{ background: C.panel, border: `1px solid ${C.grid}` }}>
       {items.map((it, i) => (
-        <React.Fragment key={it.label}>
-          {i > 0 && <div style={{ width: 1, background: C.grid }} />}
-          <Cell {...it} />
-        </React.Fragment>
+        <div
+          key={it.label}
+          style={{
+            display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+            gap: 12, padding: '15px 18px',
+            borderTop: i ? `1px solid ${C.grid}` : 'none',
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: T.sm, fontWeight: W.normal, color: C.ink }}>{it.label}</div>
+            {it.note && (
+              <div style={{ fontSize: T.xs, color: C.muted, marginTop: 3, lineHeight: 1.35 }}>
+                {it.note}
+              </div>
+            )}
+          </div>
+          <div style={{
+            fontSize: T.xl, fontWeight: W.medium, color: C.ink,
+            fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', lineHeight: 1.1,
+          }}>
+            {it.value}
+            {it.unit && (
+              <span style={{ fontSize: T.sm, color: C.muted, marginLeft: 4, fontWeight: W.normal }}>
+                {it.unit}
+              </span>
+            )}
+          </div>
+        </div>
       ))}
     </section>
   )
