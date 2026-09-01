@@ -1,0 +1,24 @@
+/* Καθολικές ρυθμίσεις — εμποδίζουν το οριζόντιο σκρολάρισμα */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Τα παιδιά grid και flex δεν επιτρέπεται να φαρδαίνουν τον γονιό */
+#root, #root * { min-width: 0; }
+
+input, button { font-family: inherit; }
+
+button:focus-visible, input:focus-visible {
+  outline: 2px solid #155F5A;
+  outline-offset: 2px;
+}
+
+/* Αφαίρεση των βελάκιων από τα αριθμητικά πεδία */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
