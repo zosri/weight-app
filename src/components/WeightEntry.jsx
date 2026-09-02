@@ -1,13 +1,19 @@
 import React, { useState } from 'react'
 import { C, T, W } from '../tokens.js'
-import { slotFromTime, SLOT_LABEL, formatDateTime } from '../lib/date.js'
+import { slotFromTime, SLOT_LABEL, formatDateTime, previousDayKey } from '../lib/date.js'
 
 /**
  * Εισαγωγή βάρους. Ημερομηνία και ώρα έρχονται από το σύστημα —
  * ο χρήστης πληκτρολογεί μόνο τον αριθμό.
+ *
+ * Στο πρωινό ζύγισμα εμφανίζεται επιπλέον ένα προαιρετικό πεδίο
+ * βημάτων, που αφορά πάντα το χθες (η μέρα έχει ήδη κλείσει μέχρι
+ * το πρωί). Αν παραλειφθεί, δεν αποθηκεύεται καθόλου — δεν
+ * μετράει σαν 0 βήματα, ώστε ο μέσος όρος να μένει αμερόληπτος.
  */
 export default function WeightEntry({ onSave }) {
   const [value, setValue] = useState('')
+  const [steps, setSteps] = useState('')
   const [error, setError] = useState(null)
   const now = Date.now()
   const slot = slotFromTime(now)
@@ -19,8 +25,21 @@ export default function WeightEntry({ onSave }) {
       return
     }
     setError(null)
+
+    const t = Date.now()
+    const m = { t, weight: +w.toFixed(2), slot: slotFromTime(t) }
+
+    if (m.slot === 'morning' && String(steps).trim() !== '') {
+      const s = parseInt(String(steps).replace(/\D/g, ''), 10)
+      if (Number.isFinite(s) && s >= 0 && s <= 100000) {
+        m.steps = s
+        m.refersTo = previousDayKey(t)
+      }
+    }
+
     setValue('')
-    onSave({ t: Date.now(), weight: +w.toFixed(2), slot: slotFromTime(Date.now()) })
+    setSteps('')
+    onSave(m)
   }
 
   return (
@@ -46,6 +65,31 @@ export default function WeightEntry({ onSave }) {
           fontVariantNumeric: 'tabular-nums',
         }}
       />
+
+      {slot === 'morning' && (
+        <div style={{ marginTop: 10 }}>
+          <label style={{ display: 'block', fontSize: T.xs, color: C.muted, marginBottom: 5 }}>
+            Βήματα χθες (προαιρετικό)
+          </label>
+          <input
+            type="number"
+            inputMode="numeric"
+            step="1"
+            placeholder="π.χ. 3200"
+            value={steps}
+            onChange={(e) => setSteps(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submit()}
+            aria-label="Βήματα χθες"
+            style={{
+              display: 'block', width: '100%', padding: '9px 12px',
+              fontSize: T.base, fontWeight: W.normal, color: C.ink,
+              background: 'transparent', border: `1px solid ${C.grid}`,
+              borderRadius: 0, outline: 'none', textAlign: 'center',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          />
+        </div>
+      )}
 
       <button
         onClick={submit}
