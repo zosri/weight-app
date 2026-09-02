@@ -67,6 +67,22 @@ export function deleteMeasurement(id) {
   return all
 }
 
+/**
+ * Μέσος όρος βημάτων από τις τελευταίες πραγματικές καταχωρήσεις
+ * (πεδίο `steps`, γράφεται μόνο στο πρωινό ζύγισμα, αφορά το χθες).
+ * Παραλειπόμενες μέρες δεν μπαίνουν καθόλου στον μέσο όρο — δεν
+ * μετράνε σαν 0, απλά δεν υπάρχουν. Χωρίς καμία καταχώρηση,
+ * γυρνά στη σταθερή τιμή του προφίλ.
+ */
+export function estimateSteps(measurements, profile, days = 7) {
+  const withSteps = measurements
+    .filter((m) => typeof m.steps === 'number' && Number.isFinite(m.steps))
+    .slice(-days)
+  if (withSteps.length === 0) return { value: profile.steps, real: false, samples: 0 }
+  const avg = withSteps.reduce((s, m) => s + m.steps, 0) / withSteps.length
+  return { value: Math.round(avg), real: true, samples: withSteps.length }
+}
+
 /** Αντίγραφο ασφαλείας — σημαντικό, τα δεδομένα ζουν μόνο στο κινητό. */
 export function exportJSON() {
   return JSON.stringify(
