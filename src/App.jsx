@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { C, T, W, FONT } from './tokens.js'
-import { loadMeasurements, addMeasurement, deleteMeasurement, loadProfile, exportJSON } from './lib/storage.js'
+import { loadMeasurements, addMeasurement, deleteMeasurement, loadProfile, exportJSON, estimateSteps } from './lib/storage.js'
 import { ewma, slopePerDay, balanceFromSlope } from './lib/trend.js'
 import { bmr, tdee } from './lib/metabolism.js'
 import WeightEntry from './components/WeightEntry.jsx'
@@ -28,8 +28,9 @@ export default function App() {
   const balance = balanceFromSlope(slope)
   const weekly = slope === null ? null : slope * 7
 
+  const steps = estimateSteps(raw, profile)
   const currentTdee = last
-    ? tdee({ ...profile, weight: last.ewma, steps: profile.steps })
+    ? tdee({ ...profile, weight: last.ewma, steps: steps.value })
     : null
 
   const stats = [
@@ -53,7 +54,11 @@ export default function App() {
       label: 'TDEE',
       value: currentTdee ? Math.round(currentTdee) : '—',
       unit: currentTdee ? 'kcal' : '',
-      note: last ? `BMR ${Math.round(bmr({ ...profile, weight: last.ewma }))} + κίνηση` : '',
+      note: last
+        ? `BMR ${Math.round(bmr({ ...profile, weight: last.ewma }))} + κίνηση, ${
+            steps.real ? `${steps.value} βήματα (${steps.samples}ημ. μ.ό.)` : `${steps.value} βήματα (προεπιλογή)`
+          }`
+        : '',
     },
   ]
 
