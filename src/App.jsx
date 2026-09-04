@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react'
 import { C, T, W, FONT } from './tokens.js'
-import { loadMeasurements, addMeasurement, deleteMeasurement, loadProfile, exportJSON, estimateSteps } from './lib/storage.js'
+import { loadMeasurements, addMeasurement, deleteMeasurement, loadProfile, exportJSON, estimateSteps, skipCounts } from './lib/storage.js'
 import { ewma, slopePerDay, balanceFromSlope } from './lib/trend.js'
 import { bmr, tdee } from './lib/metabolism.js'
+import { QUESTIONS, MAX_SKIPS } from './lib/questions.js'
 import WeightEntry from './components/WeightEntry.jsx'
 import StatBar from './components/StatBar.jsx'
 import TrendChart from './components/TrendChart.jsx'
@@ -27,8 +28,11 @@ export default function App() {
   const slope = slopePerDay(points, 14)
   const balance = balanceFromSlope(slope)
   const weekly = slope === null ? null : slope * 7
+  const warmingUp = last && last.n < 40
 
   const steps = estimateSteps(raw, profile)
+  const skips = skipCounts(raw)
+  const activeQuestions = QUESTIONS.filter((q) => (skips[q.id] || 0) < MAX_SKIPS)
   const currentTdee = last
     ? tdee({ ...profile, weight: last.ewma, steps: steps.value })
     : null
@@ -40,7 +44,7 @@ export default function App() {
       unit: last ? 'kg' : '',
       note: weekly === null
         ? 'χρειάζονται 2 εβδομάδες'
-        : `${weekly > 0 ? '+' : '−'}${Math.abs(weekly).toFixed(2)} kg την εβδομάδα`,
+        : `${weekly > 0 ? '+' : '−'}${Math.abs(weekly).toFixed(2)} kg την εβδομάδα${warmingUp ? ' · διόρθωση εκκίνησης ενεργή' : ''}`,
     },
     {
       label: 'Ενεργειακό ισοζύγιο',
@@ -91,7 +95,7 @@ export default function App() {
           </p>
         </header>
 
-        <WeightEntry onSave={save} />
+        <WeightEntry onSave={save} activeQuestions={activeQuestions} />
         <StatBar items={stats} />
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
