@@ -83,6 +83,22 @@ export function estimateSteps(measurements, profile, days = 7) {
   return { value: Math.round(avg), real: true, samples: withSteps.length }
 }
 
+/**
+ * Πλήθος skip ανά ερώτηση, σε όλο το ιστορικό. Χρησιμοποιείται για
+ * να αποσυρθεί μια ερώτηση μετά το όριο (βλ. MAX_SKIPS στο questions.js) —
+ * το skip καταγράφεται ρητά ως 'skip', ποτέ δεν συγχέεται με 'no'.
+ */
+export function skipCounts(measurements) {
+  const counts = {}
+  for (const m of measurements) {
+    if (!m.answers) continue
+    for (const [id, v] of Object.entries(m.answers)) {
+      if (v === 'skip') counts[id] = (counts[id] || 0) + 1
+    }
+  }
+  return counts
+}
+
 /** Αντίγραφο ασφαλείας — σημαντικό, τα δεδομένα ζουν μόνο στο κινητό. */
 export function exportJSON() {
   return JSON.stringify(
