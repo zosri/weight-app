@@ -4,26 +4,37 @@ import { slotFromTime, SLOT_LABEL, formatDateTime, previousDayKey } from '../lib
 
 const ANSWER_LABEL = { yes: 'Ναι', no: 'Όχι', skip: 'Παράλειψη' }
 
+/** Ημέρα (τοπική) που ανήκει ένα timestamp — για σύγκριση με το «σήμερα». */
+function isSameDay(t1, t2) {
+  const a = new Date(t1), b = new Date(t2)
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+
 /**
  * Εισαγωγή βάρους. Ημερομηνία και ώρα έρχονται από το σύστημα —
  * ο χρήστης πληκτρολογεί μόνο τον αριθμό.
  *
- * Στο πρωινό ζύγισμα εμφανίζεται επιπλέον ένα προαιρετικό πεδίο
- * βημάτων, που αφορά πάντα το χθες. Αν παραλειφθεί, δεν αποθηκεύεται
- * καθόλου — δεν μετράει σαν 0 βήματα.
+ * Το πρωινό ζύγισμα (ώρα < 11) παίρνει πάντα βήματα + ερωτήσεις.
+ * Αν όμως δεν υπάρχει ακόμα καμία μέτρηση σήμερα και η ώρα έχει
+ * περάσει το πρωινό όριο (π.χ. ξύπνημα Σαββατοκύριακου μετά τις 12:00),
+ * ρωτάμε ρητά αν είναι η πρώτη μέτρηση της ημέρας — αν ναι, παίρνει
+ * τα ίδια βήματα + ερωτήσεις σαν να ήταν πρωινό.
  *
- * Μετά την καταχώρηση βάρους+βημάτων στο πρωινό ζύγισμα, εμφανίζονται
- * (πρώτα ο αριθμός, μετά οι ερωτήσεις — όχι πριν) οι ενεργές ερωτήσεις
- * ναι/όχι για το χθες. Κάθε ερώτηση έχει και τρίτη επιλογή, «Παράλειψη»,
- * που καταγράφεται ρητά — ποτέ δεν ισοδυναμεί με «Όχι».
+ * Αν παραλειφθούν τα βήματα, δεν αποθηκεύεται καθόλου — δεν
+ * μετράει σαν 0 βήματα.
  */
-export default function WeightEntry({ onSave, activeQuestions = [] }) {
+export default function WeightEntry({ onSave, activeQuestions = [], measurements = [] }) {
   const [value, setValue] = useState('')
   const [steps, setSteps] = useState('')
   const [error, setError] = useState(null)
   const [pending, setPending] = useState(null) // { measurement, answers }
+  const [firstOfDay, setFirstOfDay] = useState(null) // null | true | false
   const now = Date.now()
   const slot = slotFromTime(now)
+
+  const noMeasurementToday = !measurements.some((m) => isSameDay(m.t, now))
+  const needsFirstOfDayPrompt = slot !== 'morning' && noMeasurementToday
+  const wantsExtras = slot === 'morning' || (needsFirstOfDayPrompt && firstOfDay === true)
 
   const submit = () => {
     const w = parseFloat(String(value).replace(',', '.'))
@@ -36,7 +47,7 @@ export default function WeightEntry({ onSave, activeQuestions = [] }) {
     const t = Date.now()
     const m = { t, weight: +w.toFixed(2), slot: slotFromTime(t) }
 
-    if (m.slot === 'morning' && String(steps).trim() !== '') {
+    if (wantsExtras && String(steps).trim() !== '') {
       const s = parseInt(String(steps).replace(/\D/g, ''), 10)
       if (Number.isFinite(s) && s >= 0 && s <= 100000) {
         m.steps = s
@@ -46,8 +57,9 @@ export default function WeightEntry({ onSave, activeQuestions = [] }) {
 
     setValue('')
     setSteps('')
+    setFirstOfDay(null)
 
-    if (m.slot === 'morning' && activeQuestions.length > 0) {
+    if (wantsExtras && activeQuestions.length > 0) {
       setPending({ measurement: m, answers: {} })
     } else {
       onSave(m)
@@ -137,7 +149,31 @@ export default function WeightEntry({ onSave, activeQuestions = [] }) {
         }}
       />
 
-      {slot === 'morning' && (
+      {needsFirstOfDayPrompt && (
+        <div style={{ marginTop: 10 }}>
+          <label style={{ display: 'block', fontSize: T.xs, color: C.muted, marginBottom: 5 }}>
+            Είναι η πρώτη μέτρηση της ημέρας;
+          </label>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[['Ναι', true], ['Όχι', false]].map(([label, v]) => (
+              <button
+                key={label}
+                onClick={() => setFirstOfDay(v)}
+                style={{
+                  flex: 1, padding: '9px 0', fontSize: T.xs, fontWeight: W.normal,
+                  cursor: 'pointer', border: `1px solid ${C.grid}`,
+                  background: firstOfDay === v ? C.ink : 'transparent',
+                  color: firstOfDay === v ? C.paper : C.ink,
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {wantsExtras && (
         <div style={{ marginTop: 10 }}>
           <label style={{ display: 'block', fontSize: T.xs, color: C.muted, marginBottom: 5 }}>
             Βήματα χθες (προαιρετικό)
