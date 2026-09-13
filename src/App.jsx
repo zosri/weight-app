@@ -95,7 +95,7 @@ export default function App() {
           </p>
         </header>
 
-        <WeightEntry onSave={save} activeQuestions={activeQuestions} />
+        <WeightEntry onSave={save} activeQuestions={activeQuestions} measurements={raw} />
         <StatBar items={stats} />
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
