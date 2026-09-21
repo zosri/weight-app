@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { C, T, W, FONT } from './tokens.js'
-import { loadMeasurements, addMeasurement, deleteMeasurement, loadProfile, exportJSON, estimateSteps, skipCounts } from './lib/storage.js'
+import { loadMeasurements, addMeasurement, deleteMeasurement, loadProfile, exportJSON, estimateSteps, skipStreaks } from './lib/storage.js'
+import { withRoles } from './lib/roles.js'
 import { ewma, slopePerDay, balanceFromSlope } from './lib/trend.js'
 import { bmr, tdee } from './lib/metabolism.js'
 import { QUESTIONS, MAX_SKIPS } from './lib/questions.js'
@@ -16,7 +17,20 @@ export default function App() {
   const [range, setRange] = useState(30)
   const profile = loadProfile()
 
-  const points = useMemo(() => ewma(raw), [raw])
+  // Κάθε μέτρηση παίρνει ρόλο· μόνο οι 'first' μπαίνουν στο EWMA.
+  const tagged = useMemo(() => withRoles(raw), [raw])
+
+  const trendPoints = useMemo(
+    () => ewma(tagged.filter((m) => m.role === 'first')),
+    [tagged]
+  )
+
+  // Όλες οι μετρήσεις για τις κουκκίδες, με το ewma κολλημένο πάνω
+  // σε όσες συμμετέχουν στην τάση.
+  const points = useMemo(() => {
+    const byId = new Map(trendPoints.map((p) => [p.id, p]))
+    return tagged.map((m) => byId.get(m.id) || m)
+  }, [tagged, trendPoints])
 
   const visible = useMemo(() => {
     if (!range) return points
@@ -24,18 +38,24 @@ export default function App() {
     return points.filter((p) => p.t >= cutoff)
   }, [points, range])
 
-  const last = points[points.length - 1]
-  const slope = slopePerDay(points, 14)
+  const last = trendPoints[trendPoints.length - 1]
+  const slope = slopePerDay(trendPoints, 14)
   const balance = balanceFromSlope(slope)
   const weekly = slope === null ? null : slope * 7
   const warmingUp = last && last.n < 40
 
   const steps = estimateSteps(raw, profile)
-  const skips = skipCounts(raw)
-  const activeQuestions = QUESTIONS.filter((q) => (skips[q.id] || 0) < MAX_SKIPS)
+  const streaks = skipStreaks(raw)
+  const activeQuestions = QUESTIONS.filter((q) => (streaks[q.id] || 0) < MAX_SKIPS)
+
   const currentTdee = last
     ? tdee({ ...profile, weight: last.ewma, steps: steps.value })
     : null
+
+  // Ο λόγος που υπάρχει όλη η εφαρμογή: πόσο έφαγες, υπολογισμένο ανάποδα.
+  // Αρνητικό ισοζύγιο (χάνεις) σημαίνει πρόσληψη κάτω από το TDEE.
+  const intake = currentTdee !== null && balance !== null ? currentTdee + balance : null
+  const offTarget = intake === null ? null : intake - profile.targetIntake
 
   const stats = [
     {
@@ -43,8 +63,20 @@ export default function App() {
       value: last ? last.ewma.toFixed(1) : '—',
       unit: last ? 'kg' : '',
       note: weekly === null
-        ? 'χρειάζονται 2 εβδομάδες'
+        ? 'χρειάζονται 2 εβδομάδες πρωινών ζυγισμάτων'
         : `${weekly > 0 ? '+' : '−'}${Math.abs(weekly).toFixed(2)} kg την εβδομάδα${warmingUp ? ' · διόρθωση εκκίνησης ενεργή' : ''}`,
+    },
+    {
+      label: 'Εκτιμώμενη πρόσληψη',
+      value: intake === null ? '—' : Math.round(intake),
+      unit: intake === null ? '' : 'kcal',
+      note: intake === null
+        ? `στόχος ${profile.targetIntake} kcal`
+        : `στόχος ${profile.targetIntake} · ${
+            Math.abs(offTarget) < 25
+              ? 'πάνω στον στόχο'
+              : `${Math.round(Math.abs(offTarget))} kcal ${offTarget > 0 ? 'πάνω' : 'κάτω'}`
+          }`,
     },
     {
       label: 'Ενεργειακό ισοζύγιο',
@@ -92,6 +124,7 @@ export default function App() {
           </h1>
           <p style={{ margin: '3px 0 0', fontSize: T.sm, color: C.muted }}>
             {raw.length} {raw.length === 1 ? 'μέτρηση' : 'μετρήσεις'}
+            {trendPoints.length !== raw.length && ` · ${trendPoints.length} στην τάση`}
           </p>
         </header>
 
