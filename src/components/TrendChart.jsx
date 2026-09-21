@@ -4,6 +4,9 @@ import { C, T, W } from '../tokens.js'
 /**
  * Γράφημα βάρους χωρίς εξωτερική βιβλιοθήκη.
  * Κουκκίδες = ακατέργαστες μετρήσεις, γραμμή = τάση.
+ * Η γραμμή περνά μόνο από τα ζυγίσματα role='first' (πρώτο της ημέρας) —
+ * αυτά έχουν πεδίο `ewma`. Τα υπόλοιπα σχεδιάζονται ως κουκκίδες αλλά
+ * δεν συμμετέχουν στην τάση.
  * Ο κάθετος άξονας κρατά παράθυρο τουλάχιστον 6 kg ώστε ο θόρυβος
  * του νερού να μη μοιάζει με δραματική αλλαγή.
  */
@@ -31,7 +34,8 @@ export default function TrendChart({ points, empty }) {
   const t1 = Math.max(...ts)
   const span = Math.max(t1 - t0, 86400000)
 
-  const vals = points.flatMap((p) => [p.weight, p.ewma])
+  const trend = points.filter((p) => typeof p.ewma === 'number')
+  const vals = points.flatMap((p) => (typeof p.ewma === 'number' ? [p.weight, p.ewma] : [p.weight]))
   let lo = Math.min(...vals), hi = Math.max(...vals)
   const pad = Math.max(0, (MIN_SPAN - (hi - lo)) / 2) + 0.25
   lo -= pad; hi += pad
@@ -39,7 +43,7 @@ export default function TrendChart({ points, empty }) {
   const x = (t) => PAD.left + ((t - t0) / span) * iw
   const y = (v) => PAD.top + (1 - (v - lo) / (hi - lo)) * ih
 
-  const line = points
+  const line = trend
     .map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.ewma).toFixed(1)}`)
     .join(' ')
 
@@ -70,10 +74,10 @@ export default function TrendChart({ points, empty }) {
 
         {points.map((p) => (
           <circle key={p.id} cx={x(p.t)} cy={y(p.weight)} r="3"
-                  fill={p.slot === 'evening' ? C.evening : C.raw} fillOpacity="0.7" />
+                  fill={p.role === 'first' ? C.raw : C.evening} fillOpacity="0.7" />
         ))}
 
-        {points.length > 1 && (
+        {trend.length > 1 && (
           <path d={line} fill="none" stroke={C.trend} strokeWidth="2.6"
                 strokeLinejoin="round" strokeLinecap="round" />
         )}
@@ -83,8 +87,8 @@ export default function TrendChart({ points, empty }) {
         display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: T.xs,
         fontWeight: 500, color: C.muted, padding: '4px 4px 2px',
       }}>
-        <Legend color={C.raw} label="πρωί" />
-        <Legend color={C.evening} label="βράδυ" />
+        <Legend color={C.raw} label="πρώτο της ημέρας" />
+        <Legend color={C.evening} label="άλλο ζύγισμα" />
         <Legend color={C.trend} label="τάση" line />
       </div>
     </div>

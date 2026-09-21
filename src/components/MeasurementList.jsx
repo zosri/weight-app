@@ -23,7 +23,10 @@ export default function MeasurementList({ points, onDelete }) {
             {p.weight.toFixed(1)}
           </span>
           <span style={{ flex: 1, fontSize: T.xs, color: C.muted, lineHeight: 1.3 }}>
-            {formatDateTime(p.t)}<br />{SLOT_LABEL[p.slot]} · τάση {p.ewma.toFixed(2)}
+            {formatDateTime(p.t)}<br />
+            {SLOT_LABEL[p.slot]} · {typeof p.ewma === 'number'
+              ? `τάση ${p.ewma.toFixed(2)}`
+              : 'εκτός τάσης'}
           </span>
           <button onClick={() => onDelete(p.id)} aria-label="Διαγραφή μέτρησης"
                   style={{

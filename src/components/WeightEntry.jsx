@@ -14,8 +14,9 @@ function isSameDay(t1, t2) {
  * Εισαγωγή βάρους. Ημερομηνία και ώρα έρχονται από το σύστημα —
  * ο χρήστης πληκτρολογεί μόνο τον αριθμό.
  *
- * Το πρωινό ζύγισμα (ώρα < 11) παίρνει πάντα βήματα + ερωτήσεις.
- * Αν όμως δεν υπάρχει ακόμα καμία μέτρηση σήμερα και η ώρα έχει
+ * Το πρώτο ζύγισμα της ημέρας σε πρωινή ώρα (< 11) παίρνει βήματα + ερωτήσεις
+ * και σημειώνεται role='first' — αυτό και μόνο τρέφει την τάση.
+ * Αν δεν υπάρχει ακόμα καμία μέτρηση σήμερα και η ώρα έχει
  * περάσει το πρωινό όριο (π.χ. ξύπνημα Σαββατοκύριακου μετά τις 12:00),
  * ρωτάμε ρητά αν είναι η πρώτη μέτρηση της ημέρας — αν ναι, παίρνει
  * τα ίδια βήματα + ερωτήσεις σαν να ήταν πρωινό.
@@ -34,7 +35,9 @@ export default function WeightEntry({ onSave, activeQuestions = [], measurements
 
   const noMeasurementToday = !measurements.some((m) => isSameDay(m.t, now))
   const needsFirstOfDayPrompt = slot !== 'morning' && noMeasurementToday
-  const wantsExtras = slot === 'morning' || (needsFirstOfDayPrompt && firstOfDay === true)
+  // Βήματα και ερωτήσεις μόνο στο *πρώτο* ζύγισμα της ημέρας. Δεύτερο
+  // πρωινό ζύγισμα στις 9:00 μετά από ένα στις 7:00 δεν ξαναρωτάει.
+  const wantsExtras = noMeasurementToday && (slot === 'morning' || firstOfDay === true)
 
   const submit = () => {
     const w = parseFloat(String(value).replace(',', '.'))
@@ -45,7 +48,14 @@ export default function WeightEntry({ onSave, activeQuestions = [], measurements
     setError(null)
 
     const t = Date.now()
-    const m = { t, weight: +w.toFixed(2), slot: slotFromTime(t) }
+    // `slot` παραμένει καθαρά αισθητικό (βγαίνει από το ρολόι). Το `role`
+    // είναι το πεδίο που μετράει: ποιο ζύγισμα τρέφει την τάση.
+    const m = {
+      t,
+      weight: +w.toFixed(2),
+      slot: slotFromTime(t),
+      role: wantsExtras ? 'first' : 'other',
+    }
 
     if (wantsExtras && String(steps).trim() !== '') {
       const s = parseInt(String(steps).replace(/\D/g, ''), 10)
