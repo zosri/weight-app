@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react'
 import { C, T, W, FONT } from './tokens.js'
-import { loadMeasurements, addMeasurement, deleteMeasurement, loadProfile, exportJSON, estimateSteps, skipStreaks } from './lib/storage.js'
+import { loadMeasurements, addMeasurement, deleteMeasurement, loadProfile, saveProfile, exportJSON, estimateSteps, skipStreaks } from './lib/storage.js'
 import { withRoles } from './lib/roles.js'
 import { ewma, slopePerDay, balanceFromSlope } from './lib/trend.js'
 import { bmr, tdee } from './lib/metabolism.js'
@@ -9,13 +9,16 @@ import WeightEntry from './components/WeightEntry.jsx'
 import StatBar from './components/StatBar.jsx'
 import TrendChart from './components/TrendChart.jsx'
 import MeasurementList from './components/MeasurementList.jsx'
+import Settings from './components/Settings.jsx'
 
 const RANGES = [[14, '14 ημ.'], [30, '30 ημ.'], [90, '90 ημ.'], [0, 'Όλα']]
 
 export default function App() {
   const [raw, setRaw] = useState(loadMeasurements)
   const [range, setRange] = useState(30)
-  const profile = loadProfile()
+  // Το προφίλ είναι state πλέον: η οθόνη ρυθμίσεων το αλλάζει και όλα
+  // τα νούμερα (BMR, TDEE, απόκλιση από τον στόχο) ξαναϋπολογίζονται.
+  const [profile, setProfile] = useState(loadProfile)
 
   // Κάθε μέτρηση παίρνει ρόλο· μόνο οι 'first' μπαίνουν στο EWMA.
   const tagged = useMemo(() => withRoles(raw), [raw])
@@ -100,6 +103,13 @@ export default function App() {
 
   const save = (m) => setRaw(addMeasurement(m))
   const remove = (id) => setRaw(deleteMeasurement(id))
+  // Επιστρέφει το προφίλ όπως τελικά αποθηκεύτηκε (με τα όρια εφαρμοσμένα),
+  // ώστε η φόρμα να δείξει πίσω την πραγματική τιμή και όχι ό,τι πληκτρολογήθηκε.
+  const updateProfile = (patch) => {
+    const next = saveProfile(patch)
+    setProfile(next)
+    return next
+  }
 
   const backup = () => {
     const blob = new Blob([exportJSON()], { type: 'application/json' })
@@ -148,14 +158,13 @@ export default function App() {
 
         <MeasurementList points={points} onDelete={remove} />
 
-        {raw.length > 0 && (
-          <button onClick={backup} style={{
-            padding: '13px', fontSize: T.sm, fontWeight: W.normal, cursor: 'pointer',
-            border: `1px solid ${C.grid}`, background: 'transparent', color: C.muted,
-          }}>
-            Αποθήκευση αντιγράφου ασφαλείας
-          </button>
-        )}
+        <Settings
+          profile={profile}
+          count={raw.length}
+          onProfile={updateProfile}
+          onMeasurements={setRaw}
+          onExport={backup}
+        />
       </div>
     </div>
   )
