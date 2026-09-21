@@ -9,6 +9,8 @@
  *   refersTo = η μέρα που αφορούν οι απαντήσεις (χθες), για τη φάση 4
  */
 
+import { slotFromTime } from './date.js'
+
 const KEY_M = 'wa.measurements.v1'
 const KEY_P = 'wa.profile.v1'
 
@@ -42,8 +44,39 @@ export function loadProfile() {
   return { ...DEFAULT_PROFILE, ...read(KEY_P, {}) }
 }
 
+/**
+ * Όρια προφίλ. Η οθόνη ρυθμίσεων τα διαβάζει για τα πεδία της, αλλά ο
+ * περιορισμός γίνεται εδώ — ώστε καμία τιμή εκτός ορίων να μη φτάσει
+ * ποτέ στους υπολογισμούς, από όποιο μονοπάτι κι αν έρθει.
+ */
+export const PROFILE_LIMITS = {
+  age:          { min: 15,   max: 100,   step: 1 },
+  height:       { min: 120,  max: 230,   step: 1 },
+  targetIntake: { min: 1000, max: 5000,  step: 25 },
+  steps:        { min: 0,    max: 50000, step: 100 },
+}
+
+function clamp(n, { min, max }) {
+  return Math.min(max, Math.max(min, n))
+}
+
+export function sanitizeProfile(patch) {
+  const out = {}
+  for (const [key, value] of Object.entries(patch)) {
+    if (key === 'sex') {
+      if (value === 'm' || value === 'f') out.sex = value
+      continue
+    }
+    const limits = PROFILE_LIMITS[key]
+    if (!limits) continue
+    const n = Number(value)
+    if (Number.isFinite(n)) out[key] = clamp(Math.round(n), limits)
+  }
+  return out
+}
+
 export function saveProfile(patch) {
-  const next = { ...loadProfile(), ...patch }
+  const next = { ...loadProfile(), ...sanitizeProfile(patch) }
   write(KEY_P, next)
   return next
 }
@@ -117,10 +150,77 @@ export function exportJSON() {
   )
 }
 
-export function importJSON(text) {
-  const data = JSON.parse(text)
-  if (!Array.isArray(data.measurements)) throw new Error('Μη έγκυρο αρχείο')
-  write(KEY_M, data.measurements)
-  if (data.profile) write(KEY_P, data.profile)
+/**
+ * Κανονικοποίηση μίας μέτρησης από αρχείο. Δέχεται και παλιά σχήματα:
+ * ό,τι λείπει συμπληρώνεται, ό,τι περισσεύει πετιέται. Το `role` δεν
+ * εφευρίσκεται εδώ — αν λείπει, το συμπεραίνει το withRoles() αργότερα.
+ */
+function normalize(m) {
+  const out = {
+    id: typeof m.id === 'string' && m.id ? m.id : `${m.t}-${Math.random().toString(36).slice(2, 7)}`,
+    t: m.t,
+    weight: +Number(m.weight).toFixed(2),
+    slot: m.slot || slotFromTime(m.t),
+    answers: m.answers && typeof m.answers === 'object' ? m.answers : {},
+  }
+  if (m.role === 'first' || m.role === 'other') out.role = m.role
+  if (typeof m.steps === 'number' && Number.isFinite(m.steps)) out.steps = m.steps
+  if (typeof m.refersTo === 'string') out.refersTo = m.refersTo
+  return out
+}
+
+function isUsable(m) {
+  return m && Number.isFinite(m.t) && Number.isFinite(Number(m.weight))
+    && Number(m.weight) >= 25 && Number(m.weight) <= 400
+}
+
+/**
+ * Διαβάζει αρχείο αντιγράφου χωρίς να αγγίξει τίποτα. Πετάει με μήνυμα
+ * στα ελληνικά αν κάτι δεν στέκει — ο έλεγχος γίνεται ΠΡΙΝ δει ο χρήστης
+ * κουμπί επαναφοράς, ώστε να μην μπορεί να σβήσει καλά δεδομένα με κακό αρχείο.
+ */
+export function parseBackup(text) {
+  let data
+  try {
+    data = JSON.parse(text)
+  } catch {
+    throw new Error('Το αρχείο δεν είναι έγκυρο JSON')
+  }
+  if (!data || !Array.isArray(data.measurements)) {
+    throw new Error('Δεν βρέθηκε λίστα μετρήσεων στο αρχείο')
+  }
+  const measurements = data.measurements.filter(isUsable).map(normalize).sort((a, b) => a.t - b.t)
+  if (measurements.length === 0) {
+    throw new Error('Καμία έγκυρη μέτρηση στο αρχείο')
+  }
+  return {
+    profile: data.profile && typeof data.profile === 'object' ? data.profile : null,
+    measurements,
+    from: measurements[0].t,
+    to: measurements[measurements.length - 1].t,
+  }
+}
+
+/**
+ * Εφαρμογή αντιγράφου.
+ *   'merge'   → κρατά ό,τι υπάρχει, προσθέτει μόνο ό,τι λείπει
+ *   'replace' → αντικαθιστά τα πάντα
+ * Η συγχώνευση αγνοεί διπλότυπα και κατά id και κατά timestamp — δύο
+ * ζυγίσματα στο ίδιο χιλιοστό του δευτερολέπτου δεν υπάρχουν στην πράξη.
+ */
+export function applyBackup(parsed, mode = 'replace') {
+  const incoming = parsed.measurements
+  let next
+  if (mode === 'merge') {
+    const current = loadMeasurements()
+    const ids = new Set(current.map((m) => m.id))
+    const times = new Set(current.map((m) => m.t))
+    const added = incoming.filter((m) => !ids.has(m.id) && !times.has(m.t))
+    next = [...current, ...added].sort((a, b) => a.t - b.t)
+  } else {
+    next = incoming
+  }
+  write(KEY_M, next)
+  if (parsed.profile) write(KEY_P, { ...DEFAULT_PROFILE, ...parsed.profile })
   return loadMeasurements()
 }
