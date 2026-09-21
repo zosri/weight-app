@@ -84,19 +84,29 @@ export function estimateSteps(measurements, profile, days = 7) {
 }
 
 /**
- * Πλήθος skip ανά ερώτηση, σε όλο το ιστορικό. Χρησιμοποιείται για
- * να αποσυρθεί μια ερώτηση μετά το όριο (βλ. MAX_SKIPS στο questions.js) —
- * το skip καταγράφεται ρητά ως 'skip', ποτέ δεν συγχέεται με 'no'.
+ * Συνεχόμενα skip ανά ερώτηση, μετρημένα από την πιο πρόσφατη καταχώρηση
+ * προς τα πίσω. Μία και μόνη απάντηση 'yes'/'no' μηδενίζει το σερί.
+ *
+ * Σκόπιμα ΟΧΙ άθροισμα όλου του ιστορικού: μια ερώτηση που την απαντάς
+ * κανονικά αλλά την προσπερνάς πού και πού θα έφτανε το όριο μέσα σε έναν
+ * χρόνο χρήσης και θα εξαφανιζόταν χωρίς λόγο.
+ *
+ * Ερώτηση που λείπει εντελώς από μια καταχώρηση (δεν τέθηκε ποτέ, ή έχει
+ * ήδη αποσυρθεί) ούτε μετράει ούτε σπάει το σερί — απλά προσπερνιέται.
  */
-export function skipCounts(measurements) {
-  const counts = {}
-  for (const m of measurements) {
-    if (!m.answers) continue
-    for (const [id, v] of Object.entries(m.answers)) {
-      if (v === 'skip') counts[id] = (counts[id] || 0) + 1
+export function skipStreaks(measurements) {
+  const streaks = {}
+  const broken = new Set()
+  for (let i = measurements.length - 1; i >= 0; i--) {
+    const answers = measurements[i].answers
+    if (!answers) continue
+    for (const [id, v] of Object.entries(answers)) {
+      if (broken.has(id)) continue
+      if (v === 'skip') streaks[id] = (streaks[id] || 0) + 1
+      else broken.add(id)
     }
   }
-  return counts
+  return streaks
 }
 
 /** Αντίγραφο ασφαλείας — σημαντικό, τα δεδομένα ζουν μόνο στο κινητό. */
