@@ -168,6 +168,14 @@ export default function Settings({ profile, onProfile, onMeasurements, onExport,
 
       <div style={{ borderTop: `1px solid ${C.grid}`, margin: '16px 0 14px' }} />
 
+      <div style={{ fontSize: T.sm, fontWeight: W.medium, marginBottom: 4 }}>Συνθήκη ζυγίσματος</div>
+      <div style={{ fontSize: T.xs, color: C.muted, lineHeight: 1.4, marginBottom: 14 }}>
+        Πρώτο ζύγισμα της ημέρας, μετά την τουαλέτα, πριν φας ή πιεις.
+        Σταθερή για κάθε μέτρηση — γι' αυτό δεν ρωτιέται πια κάθε πρωί.
+      </div>
+
+      <div style={{ borderTop: `1px solid ${C.grid}`, margin: '0 0 14px' }} />
+
       <div style={{ fontSize: T.sm, fontWeight: W.medium, marginBottom: 4 }}>Αντίγραφο ασφαλείας</div>
       <div style={{ fontSize: T.xs, color: C.muted, lineHeight: 1.4, marginBottom: 10 }}>
         Τα δεδομένα ζουν μόνο σε αυτό το κινητό. Καθαρισμός δεδομένων περιήγησης

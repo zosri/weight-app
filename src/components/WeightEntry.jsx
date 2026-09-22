@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { C, T, W } from '../tokens.js'
 import { slotFromTime, SLOT_LABEL, formatDateTime, previousDayKey } from '../lib/date.js'
+import { formatAnswer } from '../lib/questions.js'
 
 const ANSWER_LABEL = { yes: 'Ναι', no: 'Όχι', skip: 'Παράλειψη' }
 
@@ -8,6 +9,42 @@ const ANSWER_LABEL = { yes: 'Ναι', no: 'Όχι', skip: 'Παράλειψη' }
 function isSameDay(t1, t2) {
   const a = new Date(t1), b = new Date(t2)
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+
+
+const qBtn = (on) => ({
+  flex: 1, padding: '9px 0', fontSize: T.xs, fontWeight: W.normal,
+  cursor: 'pointer', border: `1px solid ${C.grid}`,
+  background: on ? C.ink : 'transparent', color: on ? C.paper : C.ink,
+})
+
+/**
+ * Αριθμητική απάντηση με +/−. Ξεκινά κενή: όσο δεν την αγγίξεις μένει
+ * αναπάντητη και καταγράφεται ως παράλειψη. Προσυμπληρωμένη τιμή θα ήταν
+ * σιωπηλή απάντηση που δεν έδωσες — ακριβώς ό,τι αποφεύγει το skip.
+ */
+function NumberAnswer({ q, value, onChange }) {
+  const empty = typeof value !== 'number'
+  const bump = (dir) => {
+    const next = empty ? q.start : value + dir * q.step
+    onChange(Math.min(q.max, Math.max(q.min, +next.toFixed(2))))
+  }
+  return (
+    <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
+      <button onClick={() => bump(-1)} aria-label="Λιγότερο" style={{ ...qBtn(false), flex: '0 0 56px' }}>−</button>
+      <div style={{
+        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        border: `1px solid ${C.grid}`, fontSize: T.base, fontWeight: W.medium,
+        color: empty ? C.muted : C.ink, fontVariantNumeric: 'tabular-nums',
+      }}>
+        {empty ? '—' : formatAnswer(q, value)}
+      </div>
+      <button onClick={() => bump(1)} aria-label="Περισσότερο" style={{ ...qBtn(false), flex: '0 0 56px' }}>+</button>
+      <button onClick={() => onChange('skip')} style={{ ...qBtn(value === 'skip'), flex: '0 0 96px' }}>
+        Παράλειψη
+      </button>
+    </div>
+  )
 }
 
 /**
@@ -84,7 +121,7 @@ export default function WeightEntry({ onSave, activeQuestions = [], measurements
     const { measurement, answers } = pending
     // ό,τι δεν απαντήθηκε ρητά λογίζεται ως παράλειψη, όχι ως 'no'
     const filled = {}
-    for (const q of activeQuestions) filled[q.id] = answers[q.id] || 'skip'
+    for (const q of activeQuestions) filled[q.id] = answers[q.id] ?? 'skip'   // ?? και όχι || : το 0 είναι έγκυρη απάντηση
     onSave({ ...measurement, answers: filled, refersTo: measurement.refersTo || previousDayKey(measurement.t) })
     setPending(null)
   }
@@ -102,22 +139,21 @@ export default function WeightEntry({ onSave, activeQuestions = [], measurements
         {activeQuestions.map((q) => (
           <div key={q.id} style={{ marginBottom: 12 }}>
             <div style={{ fontSize: T.sm, color: C.ink, marginBottom: 6 }}>{q.text}</div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {['yes', 'no', 'skip'].map((v) => (
-                <button
-                  key={v}
-                  onClick={() => answer(q.id, v)}
-                  style={{
-                    flex: 1, padding: '9px 0', fontSize: T.xs, fontWeight: W.normal,
-                    cursor: 'pointer', border: `1px solid ${C.grid}`,
-                    background: pending.answers[q.id] === v ? C.ink : 'transparent',
-                    color: pending.answers[q.id] === v ? C.paper : C.ink,
-                  }}
-                >
-                  {ANSWER_LABEL[v]}
-                </button>
-              ))}
-            </div>
+            {q.type === 'number' ? (
+              <NumberAnswer
+                q={q}
+                value={pending.answers[q.id]}
+                onChange={(v) => answer(q.id, v)}
+              />
+            ) : (
+              <div style={{ display: 'flex', gap: 6 }}>
+                {['yes', 'no', 'skip'].map((v) => (
+                  <button key={v} onClick={() => answer(q.id, v)} style={qBtn(pending.answers[q.id] === v)}>
+                    {ANSWER_LABEL[v]}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ))}
 
