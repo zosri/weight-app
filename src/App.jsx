@@ -4,12 +4,14 @@ import { loadMeasurements, addMeasurement, deleteMeasurement, loadProfile, saveP
 import { withRoles } from './lib/roles.js'
 import { ewma, slopePerDay, balanceFromSlope } from './lib/trend.js'
 import { bmr, tdee } from './lib/metabolism.js'
-import { QUESTIONS, MAX_SKIPS } from './lib/questions.js'
+import { QUESTIONS, activeQuestions as pickQuestions } from './lib/questions.js'
+import { computeAllInsights } from './lib/insights.js'
 import WeightEntry from './components/WeightEntry.jsx'
 import StatBar from './components/StatBar.jsx'
 import TrendChart from './components/TrendChart.jsx'
 import MeasurementList from './components/MeasurementList.jsx'
 import Settings from './components/Settings.jsx'
+import InsightPanel from './components/InsightPanel.jsx'
 
 const RANGES = [[14, '14 ημ.'], [30, '30 ημ.'], [90, '90 ημ.'], [0, 'Όλα']]
 
@@ -49,7 +51,10 @@ export default function App() {
 
   const steps = estimateSteps(raw, profile)
   const streaks = skipStreaks(raw)
-  const activeQuestions = QUESTIONS.filter((q) => (streaks[q.id] || 0) < MAX_SKIPS)
+  const activeQuestions = pickQuestions(streaks)
+
+  // Τα insights θέλουν τους ρόλους, όχι τις ωμές μετρήσεις.
+  const insights = useMemo(() => computeAllInsights(tagged, QUESTIONS), [tagged])
 
   const currentTdee = last
     ? tdee({ ...profile, weight: last.ewma, steps: steps.value })
@@ -155,6 +160,8 @@ export default function App() {
 
         <TrendChart points={visible}
                     empty={raw.length ? 'Καμία μέτρηση σε αυτό το διάστημα.' : undefined} />
+
+        <InsightPanel insights={insights} />
 
         <MeasurementList points={points} onDelete={remove} />
 
